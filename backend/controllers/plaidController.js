@@ -1,6 +1,7 @@
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 import User from '../models/User.js';
 import Account from '../models/Account.js';
+import Transaction from '../models/Transaction.js';
 
 const getPlaidClient = () => {
   const configuration = new Configuration({
@@ -107,6 +108,30 @@ export const getAccounts = async (req, res) => {
     res.json(savedAccounts);
   } catch (error) {
     console.error('GET ACCOUNTS ERROR:', error.response?.data || error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const deleteAccount = async (req, res) => {
+  try {
+    const accountId = req.params.id;
+    const userId = req.user._id;
+
+    const account = await Account.findOne({ _id: accountId, userId });
+
+    if (!account) {
+      return res.status(404).json({ message: 'Account not found or access denied' });
+    }
+
+    // Delete associated transactions
+    await Transaction.deleteMany({ accountId: account._id, userId });
+
+    // Delete the account
+    await account.deleteOne();
+
+    res.json({ message: 'Account and associated transactions deleted successfully' });
+  } catch (error) {
+    console.error('DELETE ACCOUNT ERROR:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Home, PieChart, CreditCard, Settings, Wallet, TrendingUp, DollarSign, RefreshCw, BarChart2, Plus, Trash2 } from 'lucide-react';
+import { LogOut, Home, PieChart, CreditCard, Settings, Wallet, TrendingUp, DollarSign, RefreshCw, BarChart2, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import LinkBank from '../components/LinkBank';
 import SpendingPieChart from '../components/Charts/SpendingPieChart';
 import MonthlyBarChart from '../components/Charts/MonthlyBarChart';
@@ -19,6 +19,8 @@ const Dashboard = () => {
   const [budgetLimit, setBudgetLimit] = useState(1500);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAccountsOpen, setIsAccountsOpen] = useState(false);
+  const [isMainAccountsOpen, setIsMainAccountsOpen] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -62,6 +64,17 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteAccount = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete the account "${name}"? This will also delete all associated transactions from your ledger.`)) return;
+    try {
+      await api.delete(`/plaid/accounts/${id}`);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to delete account:', err);
+      alert('Error deleting account: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   const totalNetWorth = accounts.reduce((sum, acc) => sum + (acc.balanceCurrent || 0), 0);
   const monthlySpent = summaryData?.monthlySpent || 0;
 
@@ -87,10 +100,43 @@ const Dashboard = () => {
             <Home className="h-5 w-5 mr-3 text-brand-400" />
             <span className="font-semibold text-sm tracking-wide">Overview</span>
           </a>
-          <a href="#" className="flex items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-            <CreditCard className="h-5 w-5 mr-3" />
-            <span className="font-medium text-sm tracking-wide">Accounts</span>
-          </a>
+          
+          <div className="space-y-1">
+            <button 
+              onClick={() => setIsAccountsOpen(!isAccountsOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"
+            >
+              <div className="flex items-center">
+                <CreditCard className="h-5 w-5 mr-3" />
+                <span className="font-medium text-sm tracking-wide">Accounts</span>
+              </div>
+              {accounts.length > 0 && (
+                isAccountsOpen ? <ChevronDown className="w-4 h-4 text-gray-500 group-hover:text-white" /> : <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-white" />
+              )}
+            </button>
+            
+            {/* Nested Accounts Toggleable */}
+            {isAccountsOpen && accounts.length > 0 && (
+              <div className="pl-12 space-y-1 mt-1">
+                {accounts.map(acc => (
+                  <div key={acc._id} className="group flex items-center justify-between py-1.5 pr-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <div className="flex flex-col min-w-0 pr-2 cursor-pointer">
+                       <span className="text-xs font-medium text-gray-300 truncate">{acc.name}</span>
+                       <span className="text-[10px] text-gray-500 truncate">${(acc.balanceCurrent || 0).toLocaleString()}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.preventDefault(); handleDeleteAccount(acc._id, acc.name); }}
+                      className="p-1 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete Account"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <a href="#" className="flex items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
             <PieChart className="h-5 w-5 mr-3" />
             <span className="font-medium text-sm tracking-wide">Budgets</span>
@@ -245,30 +291,45 @@ const Dashboard = () => {
             {/* Accounts Table List */}
             {accounts.length > 0 && (
               <div className="glass-card rounded-3xl border border-white/5 overflow-hidden mt-6">
-                <div className="px-6 py-5 border-b border-white/5 flex justify-between items-center">
+                <button 
+                  onClick={() => setIsMainAccountsOpen(!isMainAccountsOpen)}
+                  className="w-full px-6 py-5 border-b border-white/5 flex justify-between items-center hover:bg-white/5 transition-colors group"
+                >
                   <h3 className="text-lg font-semibold text-white">Active Connections</h3>
-                </div>
-                <div className="divide-y divide-white/5">
-                  {accounts.map(account => (
-                    <div key={account._id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-brand-500/10 flex items-center justify-center border border-brand-500/20">
-                          <CreditCard className="h-6 w-6 text-brand-400" />
+                  {isMainAccountsOpen ? <ChevronDown className="w-5 h-5 text-gray-500 group-hover:text-white" /> : <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white" />}
+                </button>
+                {isMainAccountsOpen && (
+                  <div className="divide-y divide-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {accounts.map(account => (
+                      <div key={account._id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-brand-500/10 flex items-center justify-center border border-brand-500/20">
+                            <CreditCard className="h-6 w-6 text-brand-400" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-white text-lg">{account.name}</p>
+                            <p className="text-sm text-gray-400 capitalize">{account.subtype} • {account.officialName || 'Standard Account'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-white text-lg">{account.name}</p>
-                          <p className="text-sm text-gray-400 capitalize">{account.subtype} • {account.officialName || 'Standard Account'}</p>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-white">
+                              ${(account.balanceCurrent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-sm text-gray-400">Current Balance</p>
+                          </div>
+                          <button 
+                            onClick={() => handleDeleteAccount(account._id, account.name)}
+                            className="p-2.5 text-red-500/50 hover:text-red-400 hover:bg-red-400/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-red-400/20"
+                            title="Delete Account"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-white">
-                          ${(account.balanceCurrent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-sm text-gray-400">Current Balance</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
